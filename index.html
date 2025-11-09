@@ -17,7 +17,9 @@
   }
   .card.matched { background:#2ecc71; color:#fff; cursor:default; }
   .card.revealed { transform: rotateY(180deg); }
-  #score { margin-top:20px; font-size:1.2rem; }
+  #score, #misclicks { margin-top:20px; font-size:1.2rem; }
+  .game-over { color:red; font-weight:bold; margin-top:10px; display:none; }
+  .win-message { color:lime; font-weight:bold; margin-top:10px; display:none; }
 </style>
 </head>
 <body>
@@ -25,22 +27,22 @@
 <p>Flip cards to find the matching pairs!</p>
 <div class="grid" id="grid"></div>
 <p id="score">Matched Pairs: 0</p>
+<p id="misclicks">Misclicks: 0</p>
+<p class="game-over">Too many misclicks - GAME OVER! Press any key to restart.</p>
+<p class="win-message">You Win! 🎉 Press any key to play again.</p>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(function () {
     const grid = $('#grid')[0];
+    const maxMisclicks = 10;
+    let misclicks = 0;
+    let gameOver = false;
+    let win = false;
 
-    //////////////////////////////////
-    // ONLY CHANGE BELOW THIS POINT //
-    //////////////////////////////////
-
-    // TODO 1 - Create a shuffled deck of paired values (using emojis for color/pictures)
     const cardValues = ['🍎','🍌','🍇','🍓','🍒','🥝','🍍','🍉'];
-    let cards = [...cardValues, ...cardValues];
-    cards.sort(() => 0.5 - Math.random());
+    let cards = [];
 
-    // TODO 2 - Reveal cards and check for matches
     let firstCard = null;
     let secondCard = null;
     let lockBoard = false;
@@ -54,55 +56,91 @@ $(function () {
         $('#score').text(`Matched Pairs: ${matchedPairs}`);
     }
 
-    function checkWin() {
-        if (matchedPairs === cardValues.length) {
-            setTimeout(() => alert("You Win! 🎉"), 200);
-        }
+    function updateMisclicks() {
+        $('#misclicks').text(`Misclicks: ${misclicks}`);
     }
 
-    // Create card elements and add click events
-    cards.forEach(value => {
-        const card = document.createElement('div');
-        card.classList.add('card');
-        card.dataset.value = value;
-        grid.appendChild(card);
+    function triggerWin() {
+        win = true;
+        $('.win-message').fadeIn();
+        $('.card').off('click');
+    }
 
-        card.addEventListener('click', () => {
-            if (lockBoard || card === firstCard || card.classList.contains('matched')) return;
+    function triggerGameOver() {
+        gameOver = true;
+        $('.game-over').fadeIn();
+        $('.card').off('click');
+    }
 
-            card.textContent = value; 
-            card.classList.add('revealed');
+    function restartGame() {
+        $('.game-over, .win-message').hide();
+        $('#grid').empty();
+        misclicks = 0;
+        matchedPairs = 0;
+        updateMisclicks();
+        updateScore();
+        gameOver = false;
+        win = false;
+        initializeCards();
+    }
 
-            if (!firstCard) {
-                firstCard = card;
-                return;
-            }
+    function initializeCards() {
+        cards = [...cardValues, ...cardValues];
+        cards.sort(() => 0.5 - Math.random());
 
-            secondCard = card;
+        cards.forEach(value => {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.value = value;
+            grid.appendChild(card);
 
-            if (firstCard.dataset.value === secondCard.dataset.value) {
-                firstCard.classList.add('matched');
-                secondCard.classList.add('matched');
-                matchedPairs++;
-                updateScore();
-                checkWin();
-                resetTurn();
-            } else {
-                lockBoard = true;
-                setTimeout(() => {
-                    firstCard.textContent = '';
-                    secondCard.textContent = '';
-                    firstCard.classList.remove('revealed');
-                    secondCard.classList.remove('revealed');
+            card.addEventListener('click', () => {
+                if (lockBoard || card === firstCard || card.classList.contains('matched') || gameOver || win) return;
+
+                card.textContent = value; 
+                card.classList.add('revealed');
+
+                if (!firstCard) {
+                    firstCard = card;
+                    return;
+                }
+
+                secondCard = card;
+
+                if (firstCard.dataset.value === secondCard.dataset.value) {
+                    firstCard.classList.add('matched');
+                    secondCard.classList.add('matched');
+                    matchedPairs++;
+                    updateScore();
                     resetTurn();
-                }, 1000);
-            }
+
+                    if (matchedPairs === cardValues.length) {
+                        triggerWin();
+                    }
+                } else {
+                    lockBoard = true;
+                    setTimeout(() => {
+                        firstCard.textContent = '';
+                        secondCard.textContent = '';
+                        firstCard.classList.remove('revealed');
+                        secondCard.classList.remove('revealed');
+                        resetTurn();
+                        misclicks++;
+                        updateMisclicks();
+                        if (misclicks >= maxMisclicks) triggerGameOver();
+                    }, 1000);
+                }
+            });
         });
+    }
+
+    // Restart on ANY key press (after win or lose)
+    $(document).on('keydown', () => {
+        if (gameOver || win) restartGame();
     });
 
-    //////////////////////////////////
-    // ONLY CHANGE ABOVE THIS POINT //
-    //////////////////////////////////
+    // Start the game for the first time
+    initializeCards();
 });
 </script>
 </body>
